@@ -5,43 +5,47 @@ import java.net.Socket;
 import java.sql.Timestamp;
 import java.util.*;
 
-/**
- * Hello world!
- *
- */
-public class LWWElement<E,T> 
-{
+public class ZSETElement<E,T,S>  {
 	Map<E,T> ZA;
 	Map<E,T> ZR;
+	Map<E,S> ZS;
 	Timestamp tmpTS;
+	Timestamp currentTS;
 
 	//NEW() -> Z
 	public void New(){
 		ZA = new HashMap<>();
 		ZR = new HashMap<>();
+		ZS = new HashMap<>();
 	}
 	
 	//ADD(Z,e,t)
-	public void Add(E element, Timestamp t){
+	public void Add(E element, Integer score){
+		currentTS = getCurrentTimeStamp();
+		ZS.put(element, (S) score);
 		if( ZA.containsKey(element)){
 			tmpTS = (Timestamp) ZA.get(element);
-			if(tmpTS.compareTo(t) < 0) {
-				ZA.put(element, (T) t);
+			if(tmpTS.compareTo(currentTS) < 0) {
+				ZA.put(element, (T) currentTS);
 			}
 		} else {
-			ZA.put(element, (T) t);
+			ZA.put(element, (T) currentTS);			
 		}
 	}
 	
 	//Remove(Z,e,t)
-	public void Remove(E element, Timestamp t){
+	public void Remove(E element){
+		currentTS = getCurrentTimeStamp();
 		if( ZR.containsKey(element)){
 			tmpTS = (Timestamp) ZR.get(element);
-			if(tmpTS.compareTo(t) < 0) {
-				ZR.put(element, (T) t);
+			if(tmpTS.compareTo(currentTS) < 0) {
+				ZR.put(element, (T) currentTS);
 			}			
 		} else {
-			ZR.put(element, (T) t);
+			ZR.put(element, (T) currentTS);
+		}
+		if( ZS.containsKey(element)){
+			ZS.remove(element);
 		}
 	}
 	
@@ -63,19 +67,22 @@ public class LWWElement<E,T>
 		return elementExist;
 	}
 	
-	public E[] Get(){
-		List<E> elementList = new ArrayList<>();
+	public Object[] Get(){		
+		List<String> elementList = new ArrayList<>();
 		ZA.forEach((e,t) ->{
+			String memberWithScores = "";
 			if(ZR.containsKey(e)) {			
 				tmpTS = (Timestamp) ZR.get(e);
 				if(((Timestamp) t).compareTo(tmpTS)>1) {
-					elementList.add(e);					
+					memberWithScores = e + "->" + ZS.get(e);
+					elementList.add(memberWithScores);					
 				} 
 			} else {
-				elementList.add(e);
+				memberWithScores = e + "->" + ZS.get(e);
+				elementList.add(memberWithScores);
 			}	
 		});
-		return (E[]) elementList.toArray();
+		return (Object[]) elementList.toArray();
 	}
 	
 	public static Timestamp getCurrentTimeStamp() {
@@ -84,19 +91,14 @@ public class LWWElement<E,T>
 	
     public static void main( String[] args )
     {	
-    	LWWElement<Object,Timestamp> lww = new LWWElement<Object, Timestamp>();
-    	lww.New();
-    	lww.Add("abc", getCurrentTimeStamp());
-    	lww.Add("xyz", getCurrentTimeStamp());
-    	vi.viredis.client.ViRedis client;
-		try {
-			client = new vi.viredis.client.ViRedis(new Socket("127.0.0.1", 6379));
-	    	client.put("foo", "bar");
-	    	System.out.println(client.get("foo")); // will print 'bar'
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
+    	ZSETElement<String, Timestamp, Integer> zset = new ZSETElement<String, Timestamp, Integer>();
+    	zset.New();
+    	zset.Add("abc",1);
+    	zset.Add("xyz",2);
+    	zset.Add("abc",5);
+    	zset.Remove("xyz");
+    	Object[] elementlist = zset.Get();
+    	for(Object s:elementlist) 
+    		System.out.println(s);
     }
 }
